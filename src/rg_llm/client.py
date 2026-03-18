@@ -301,6 +301,98 @@ class UnifiedLLMClient:
             },
         )
 
+    @staticmethod
+    def _convert_openai_to_anthropic_messages(
+        openai_messages: List[Dict[str, Any]],
+    ) -> tuple:
+        """Convert OpenAI-format messages to Anthropic Messages API format.
+
+        Handles tool_calls in assistant messages, tool role messages,
+        consecutive same-role merging, and first-message-must-be-user.
+        Returns (system_content, converted_messages).
+        """
+        system_parts: List[str] = []
+        converted: List[Dict[str, Any]] = []
+        i = 0
+        while i < len(openai_messages):
+            msg = openai_messages[i]
+            role = msg.get("role", "")
+
+            if role == "system":
+                system_parts.append(msg.get("content", ""))
+                i += 1
+                continue
+
+            if role == "assistant" and msg.get("tool_calls"):
+                content_blocks: List[Dict] = []
+                text = msg.get("content", "")
+                if text and text.strip():
+                    content_blocks.append({"type": "text", "text": text.strip()})
+                for tc in msg["tool_calls"]:
+                    fn = tc.get("function", {})
+                    args_str = fn.get("arguments", "{}")
+                    try:
+                        args_obj = json.loads(args_str) if isinstance(args_str, str) else args_str
+                    except json.JSONDecodeError:
+                        args_obj = {}
+                    content_blocks.append({
+                        "type": "tool_use",
+                        "id": tc.get("id", "call_0"),
+                        "name": fn.get("name", ""),
+                        "input": args_obj,
+                    })
+                if not content_blocks:
+                    content_blocks.append({"type": "text", "text": text or "I'll use a tool."})
+                converted.append({"role": "assistant", "content": content_blocks})
+                i += 1
+                # Collect following tool result messages into one user message
+                tool_result_blocks: List[Dict] = []
+                while i < len(openai_messages) and openai_messages[i].get("role") == "tool":
+                    tm = openai_messages[i]
+                    tool_result_blocks.append({
+                        "type": "tool_result",
+                        "tool_use_id": tm.get("tool_call_id", "call_0"),
+                        "content": tm.get("content", ""),
+                    })
+                    i += 1
+                if tool_result_blocks:
+                    converted.append({"role": "user", "content": tool_result_blocks})
+                continue
+
+            if role == "tool":
+                converted.append({"role": "user", "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": msg.get("tool_call_id", "call_0"),
+                    "content": msg.get("content", ""),
+                }]})
+                i += 1
+                continue
+
+            if role in ("user", "assistant"):
+                converted.append({"role": role, "content": msg.get("content", "")})
+            i += 1
+
+        # Merge consecutive same-role messages (Anthropic requires alternating)
+        merged: List[Dict] = []
+        for m in converted:
+            if merged and merged[-1]["role"] == m["role"]:
+                prev, curr = merged[-1]["content"], m["content"]
+                if isinstance(prev, str) and isinstance(curr, str):
+                    merged[-1]["content"] = prev + "\n" + curr
+                elif isinstance(prev, list) and isinstance(curr, list):
+                    merged[-1]["content"] = prev + curr
+                elif isinstance(prev, str) and isinstance(curr, list):
+                    merged[-1]["content"] = [{"type": "text", "text": prev}] + curr
+                elif isinstance(prev, list) and isinstance(curr, str):
+                    merged[-1]["content"] = prev + [{"type": "text", "text": curr}]
+            else:
+                merged.append(m)
+
+        if merged and merged[0]["role"] != "user":
+            merged.insert(0, {"role": "user", "content": "Continue."})
+
+        return "\n".join(system_parts).strip(), merged
+
     async def _call_anthropic(
         self,
         config: ProviderConfig,
@@ -309,14 +401,7 @@ class UnifiedLLMClient:
         request: LLMRequest,
     ) -> LLMResponse:
         """Call Anthropic Messages API."""
-        # Split system messages from user/assistant messages
-        system_parts = []
-        messages = []
-        for msg in request.messages:
-            if msg.get("role") == "system":
-                system_parts.append(msg.get("content", ""))
-            else:
-                messages.append({"role": msg["role"], "content": msg.get("content", "")})
+        system_content, messages = self._convert_openai_to_anthropic_messages(request.messages)
 
         headers = {
             "x-api-key": api_key,
@@ -329,8 +414,8 @@ class UnifiedLLMClient:
             "temperature": request.temperature,
             "messages": messages,
         }
-        if system_parts:
-            payload["system"] = "\n".join(system_parts)
+        if system_content:
+            payload["system"] = system_content
 
         # Anthropic tool format
         if request.tools and config.supports_tools:
@@ -593,13 +678,7 @@ class UnifiedLLMClient:
         request: LLMRequest,
     ) -> AsyncIterator[LLMStreamEvent]:
         """Stream from Anthropic Messages API."""
-        system_parts = []
-        messages = []
-        for msg in request.messages:
-            if msg.get("role") == "system":
-                system_parts.append(msg.get("content", ""))
-            else:
-                messages.append({"role": msg["role"], "content": msg.get("content", "")})
+        system_content, messages = self._convert_openai_to_anthropic_messages(request.messages)
 
         headers = {
             "x-api-key": api_key,
@@ -613,8 +692,8 @@ class UnifiedLLMClient:
             "messages": messages,
             "stream": True,
         }
-        if system_parts:
-            payload["system"] = "\n".join(system_parts)
+        if system_content:
+            payload["system"] = system_content
         if request.tools and config.supports_tools:
             anthropic_tools = []
             for tool in request.tools:
