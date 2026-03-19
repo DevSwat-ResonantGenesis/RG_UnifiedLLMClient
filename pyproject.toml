@@ -7,7 +7,7 @@ name = "rg-unified-llm-client"
 version = "0.1.0"
 description = "Unified LLM Client for the Resonant Genesis platform — one client, every provider, every surface."
 readme = "README.md"
-license = "MIT"
+license = "LicenseRef-RG-Source-Available"
 requires-python = ">=3.10"
 authors = [
     { name = "Resonant Genesis", email = "dev@resonantgenesis.com" },
