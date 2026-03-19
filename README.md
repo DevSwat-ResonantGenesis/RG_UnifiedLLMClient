@@ -4,11 +4,11 @@
 
 ### One async Python client for every AI provider
 
-**Built entirely by AI, orchestrated by [Louie Nemesh](https://resonantgenesis.xyz)**
+**Built entirely by AI, orchestrated by [Louie Nemesh](https://dev-swat.com)**
 
 [![License: RG Source Available](https://img.shields.io/badge/License-RG%20Source%20Available-blue.svg)](LICENSE.txt)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg)](https://python.org)
-[![Platform](https://img.shields.io/badge/Platform-resonantgenesis.xyz-purple.svg)](https://resonantgenesis.xyz)
+[![Platform](https://img.shields.io/badge/Platform-dev--swat.com-purple.svg)](https://dev-swat.com)
 
 </div>
 
@@ -256,9 +256,9 @@ Copyright (c) 2025-2026 Resonant Genesis / DevSwat. Founded and built by Louie N
 Licensed under the [Resonant Genesis Source Available License](LICENSE.txt).
 
 - **View & study**: Free for everyone
-- **Download & use**: Free with [platform registration](https://resonantgenesis.xyz/signup)
+- **Download & use**: Free with [platform registration](https://dev-swat.com/signup)
 - **Contribute**: Pull requests welcome
-- **Commercial use**: [Contact us](https://resonantgenesis.xyz/contact)
+- **Commercial use**: [Contact us](https://dev-swat.com/contact)
 
 ---
 
