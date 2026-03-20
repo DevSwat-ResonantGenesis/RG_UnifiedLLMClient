@@ -1,5 +1,6 @@
 .App {
-  text-align: center;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+  min-height: 100vh;
 }
 
 .App-logo {
@@ -15,12 +16,7 @@
 
 .App-header {
   background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  padding: 20px;
   color: white;
 }
 
@@ -35,4 +31,42 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00ffff;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff00ff;
+}
+
+/* Glowing effects */
+.MuiCard-root {
+  box-shadow: 0 4px 20px rgba(0, 255, 255, 0.1) !important;
+  transition: all 0.3s ease !important;
+}
+
+.MuiCard-root:hover {
+  box-shadow: 0 8px 40px rgba(0, 255, 255, 0.2) !important;
+  transform: translateY(-2px);
+}
+
+.MuiButton-contained {
+  background: linear-gradient(45deg, #00ffff, #ff00ff) !important;
+  box-shadow: 0 3px 15px rgba(0, 255, 255, 0.3) !important;
+}
+
+.MuiButton-contained:hover {
+  box-shadow: 0 6px 30px rgba(0, 255, 255, 0.5) !important;
 }
