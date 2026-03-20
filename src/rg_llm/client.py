@@ -640,7 +640,10 @@ class UnifiedLLMClient:
                             "total_tokens": u.get("total_tokens", 0),
                         }
 
-                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    choices = chunk.get("choices", [])
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {})
 
                     # Text content
                     content = delta.get("content", "")
