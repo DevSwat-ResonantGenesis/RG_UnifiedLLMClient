@@ -599,6 +599,7 @@ class UnifiedLLMClient:
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
         if request.tools and config.supports_tools:
             payload["tools"] = request.tools
@@ -609,6 +610,7 @@ class UnifiedLLMClient:
 
         # Accumulate tool calls across chunks
         tool_call_accum: Dict[int, Dict[str, str]] = {}
+        usage: Dict[str, int] = {}
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             async with client.stream(
@@ -628,6 +630,15 @@ class UnifiedLLMClient:
                         chunk = json.loads(data_str)
                     except json.JSONDecodeError:
                         continue
+
+                    # Usage is in the final chunk (when stream_options.include_usage is set)
+                    if chunk.get("usage"):
+                        u = chunk["usage"]
+                        usage = {
+                            "prompt_tokens": u.get("prompt_tokens", 0),
+                            "completion_tokens": u.get("completion_tokens", 0),
+                            "total_tokens": u.get("total_tokens", 0),
+                        }
 
                     delta = chunk.get("choices", [{}])[0].get("delta", {})
 
@@ -672,6 +683,7 @@ class UnifiedLLMClient:
             event=StreamEventType.DONE,
             provider=config.id,
             model=model,
+            usage=usage if usage else None,
         )
 
     async def _stream_anthropic(
