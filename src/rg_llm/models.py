@@ -49,6 +49,7 @@ class LLMRequest:
     temperature: float = 0.7
     max_tokens: int = 4096
     tools: Optional[List[Dict[str, Any]]] = None
+    tool_choice: Optional[str] = None  # "auto", "required", "none"
     response_format: Optional[Dict[str, str]] = None
     stream: bool = False
     user_id: Optional[str] = None

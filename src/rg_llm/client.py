@@ -264,6 +264,8 @@ class UnifiedLLMClient:
         }
         if request.tools and config.supports_tools:
             payload["tools"] = request.tools
+            if request.tool_choice:
+                payload["tool_choice"] = request.tool_choice
         if request.response_format and config.supports_json_mode:
             payload["response_format"] = request.response_format
 
@@ -600,6 +602,8 @@ class UnifiedLLMClient:
         }
         if request.tools and config.supports_tools:
             payload["tools"] = request.tools
+            if request.tool_choice:
+                payload["tool_choice"] = request.tool_choice
         if request.response_format and config.supports_json_mode:
             payload["response_format"] = request.response_format
 
@@ -704,6 +708,13 @@ class UnifiedLLMClient:
                     "input_schema": fn.get("parameters", {}),
                 })
             payload["tools"] = anthropic_tools
+            if request.tool_choice:
+                # Anthropic uses {"type": "auto"|"any"|"tool"} format
+                tc = request.tool_choice
+                if tc == "required":
+                    payload["tool_choice"] = {"type": "any"}
+                elif tc in ("auto", "none"):
+                    payload["tool_choice"] = {"type": tc}
 
         # Track tool calls being built
         current_tool: Optional[Dict[str, str]] = None
