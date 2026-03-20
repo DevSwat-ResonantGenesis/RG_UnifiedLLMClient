@@ -599,7 +599,6 @@ class UnifiedLLMClient:
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,
             "stream": True,
-            "stream_options": {"include_usage": True},
         }
         if request.tools and config.supports_tools:
             payload["tools"] = request.tools
@@ -607,6 +606,10 @@ class UnifiedLLMClient:
                 payload["tool_choice"] = request.tool_choice
         if request.response_format and config.supports_json_mode:
             payload["response_format"] = request.response_format
+
+        # Only OpenAI supports stream_options for usage tracking
+        if "api.openai.com" in config.base_url:
+            payload["stream_options"] = {"include_usage": True}
 
         # Accumulate tool calls across chunks
         tool_call_accum: Dict[int, Dict[str, str]] = {}
@@ -639,6 +642,7 @@ class UnifiedLLMClient:
                             "completion_tokens": u.get("completion_tokens", 0),
                             "total_tokens": u.get("total_tokens", 0),
                         }
+                        logger.info(f"[LLM-stream] {config.id} usage: {usage}")
 
                     choices = chunk.get("choices", [])
                     if not choices:
