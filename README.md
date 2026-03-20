@@ -232,14 +232,19 @@ pytest tests/ -v
 
 This module is the **single LLM layer** for the entire Resonant Genesis platform:
 
-| Surface | Integration |
-|---------|-------------|
-| **Resonant Chat** (web) | `facade.py` → `UnifiedLLMClient` |
-| **Agent Engine** | `executor.py` → `UnifiedLLMClient` |
-| **IDE Completions** | `ide_completions.py` → `UnifiedLLMClient` |
-| **Agent Planner** | `planner.py` → `UnifiedLLMClient` |
+| Service | Docker Container | Integration |
+|---------|-----------------|-------------|
+| **Registered Users Agentic Chat** | `rg_agentic_chat` | Volume-mounted, multi-provider chat with 112 handlers |
+| **Public Guest Agentic Chat** | `rg_public_guest_chat` | Volume-mounted, multi-provider fallback for guest chat |
+| **Resonant Chat** (web) | `chat_service` | `facade.py` → `UnifiedLLMClient` |
+| **IDE Completions** | `chat_service` | `ide_completions.py` → `UnifiedLLMClient` |
+| **Agent Engine** | `agent_engine_service` | `executor.py` + `planner.py` → `UnifiedLLMClient` |
 
-Deployed on production via Docker volume mount — shared across `chat_service` and `agent_engine_service` containers.
+Deployed on production via Docker **read-only volume mount** — shared across 4 containers:
+```
+- /home/deploy/RG_UnifiedLLMClient/src/rg_llm:/app/rg_llm:ro
+```
+All containers use `PYTHONPATH=/app` so imports work as `from rg_llm import ...`.
 
 ---
 
