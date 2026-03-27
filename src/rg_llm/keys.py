@@ -36,7 +36,10 @@ def resolve_api_key(
         env_val = os.getenv(provider.env_key_name, "")
         # Handle comma-separated keys (e.g. GROQ_API_KEY=key1,key2)
         if env_val:
-            return env_val.split(",")[0].strip()
+            for k in env_val.split(","):
+                k = k.strip()
+                if k:
+                    return k
     return None
 
 
@@ -78,15 +81,17 @@ def build_provider_chain(
         seen_keys.add((config.id, key))
 
     def _add_both_keys(config: ProviderConfig, model: str) -> None:
-        """Add BYOK key first, then system key — dual-key resolution."""
+        """Add BYOK key first, then ALL system keys — multi-key resolution."""
         byok = user_keys.get(config.id, "")
         _add(config, model, byok)
 
         if config.env_key_name:
             env_val = os.getenv(config.env_key_name, "")
             if env_val:
-                sys_key = env_val.split(",")[0].strip()
-                _add(config, model, sys_key)
+                for sys_key in env_val.split(","):
+                    sys_key = sys_key.strip()
+                    if sys_key:
+                        _add(config, model, sys_key)
 
     # 1. Preferred provider first
     if preferred_provider:
