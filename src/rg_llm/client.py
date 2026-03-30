@@ -544,6 +544,93 @@ class UnifiedLLMClient:
             },
         )
 
+    @staticmethod
+    def _convert_openai_to_gemini_messages(
+        openai_messages: List[Dict[str, Any]],
+    ) -> tuple:
+        """Convert OpenAI-format messages to Gemini generateContent format.
+
+        Handles tool_calls in assistant messages (→ functionCall parts),
+        tool role messages (→ functionResponse parts in user turn),
+        empty/None content, and consecutive same-role merging.
+        Returns (system_instruction, contents).
+        """
+        system_parts: List[str] = []
+        contents: List[Dict[str, Any]] = []
+        i = 0
+        while i < len(openai_messages):
+            msg = openai_messages[i]
+            role = msg.get("role", "")
+
+            if role == "system":
+                system_parts.append(msg.get("content", "") or "")
+                i += 1
+                continue
+
+            if role == "assistant":
+                parts: List[Dict] = []
+                text = msg.get("content") or ""
+                if text.strip():
+                    parts.append({"text": text})
+                # Convert tool_calls → functionCall parts
+                for tc in msg.get("tool_calls", []):
+                    fn = tc.get("function", {})
+                    args_str = fn.get("arguments", "{}")
+                    try:
+                        args_obj = json.loads(args_str) if isinstance(args_str, str) else args_str
+                    except json.JSONDecodeError:
+                        args_obj = {}
+                    parts.append({"functionCall": {"name": fn.get("name", ""), "args": args_obj}})
+                if not parts:
+                    parts.append({"text": "I'll investigate."})
+                contents.append({"role": "model", "parts": parts})
+                i += 1
+
+                # Collect following tool-result messages into one user turn
+                fn_response_parts: List[Dict] = []
+                while i < len(openai_messages) and openai_messages[i].get("role") == "tool":
+                    tm = openai_messages[i]
+                    fn_response_parts.append({
+                        "functionResponse": {
+                            "name": tm.get("name", "tool"),
+                            "response": {"content": tm.get("content", "")},
+                        }
+                    })
+                    i += 1
+                if fn_response_parts:
+                    contents.append({"role": "user", "parts": fn_response_parts})
+                continue
+
+            if role == "tool":
+                # Orphan tool message (no preceding assistant) — wrap as user
+                contents.append({"role": "user", "parts": [{
+                    "functionResponse": {
+                        "name": msg.get("name", "tool"),
+                        "response": {"content": msg.get("content", "")},
+                    }
+                }]})
+                i += 1
+                continue
+
+            if role == "user":
+                text = msg.get("content") or ""
+                contents.append({"role": "user", "parts": [{"text": text or "Continue."}]})
+            i += 1
+
+        # Merge consecutive same-role entries (Gemini requires alternating)
+        merged: List[Dict] = []
+        for c in contents:
+            if merged and merged[-1]["role"] == c["role"]:
+                merged[-1]["parts"].extend(c["parts"])
+            else:
+                merged.append(c)
+
+        # Gemini requires first message to be user
+        if merged and merged[0]["role"] != "user":
+            merged.insert(0, {"role": "user", "parts": [{"text": "Continue."}]})
+
+        return "\n".join(system_parts).strip(), merged
+
     async def _call_google(
         self,
         config: ProviderConfig,
@@ -552,18 +639,8 @@ class UnifiedLLMClient:
         request: LLMRequest,
     ) -> LLMResponse:
         """Call Google Gemini generateContent API."""
-        # Convert messages to Gemini format
-        contents = []
-        system_instruction = None
-        for msg in request.messages:
-            if msg.get("role") == "system":
-                system_instruction = msg.get("content", "")
-            else:
-                role = "user" if msg["role"] == "user" else "model"
-                contents.append({
-                    "role": role,
-                    "parts": [{"text": msg.get("content", "")}],
-                })
+        # Convert messages to Gemini format (handles tool calls properly)
+        system_instruction, contents = self._convert_openai_to_gemini_messages(request.messages)
 
         url = f"{config.base_url}/models/{model}:generateContent?key={api_key}"
         payload: Dict[str, Any] = {
