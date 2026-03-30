@@ -24,6 +24,7 @@ class ProviderConfig:
     default_model: str
     models: List[str] = field(default_factory=list)
     env_key_name: str = ""
+    env_key_aliases: List[str] = field(default_factory=list)  # Additional env vars to check for keys
     headers: Dict[str, str] = field(default_factory=dict)
     supports_vision: bool = False
     supports_tools: bool = True

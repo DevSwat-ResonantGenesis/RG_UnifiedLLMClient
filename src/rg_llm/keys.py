@@ -81,12 +81,21 @@ def build_provider_chain(
         seen_keys.add((config.id, key))
 
     def _add_both_keys(config: ProviderConfig, model: str) -> None:
-        """Add BYOK key first, then ALL system keys — multi-key resolution."""
+        """Add BYOK key first, then ALL system keys — multi-key resolution.
+
+        Checks env_key_name and env_key_aliases for additional keys.
+        """
         byok = user_keys.get(config.id, "")
         _add(config, model, byok)
 
+        # Collect keys from primary env var + all alias env vars
+        env_names = []
         if config.env_key_name:
-            env_val = os.getenv(config.env_key_name, "")
+            env_names.append(config.env_key_name)
+        env_names.extend(getattr(config, "env_key_aliases", []))
+
+        for env_name in env_names:
+            env_val = os.getenv(env_name, "")
             if env_val:
                 for sys_key in env_val.split(","):
                     sys_key = sys_key.strip()

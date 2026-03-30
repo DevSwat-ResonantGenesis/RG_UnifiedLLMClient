@@ -52,6 +52,7 @@ BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
         default_model="gemini-2.0-flash",
         models=["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
         env_key_name="GEMINI_API_KEY",
+        env_key_aliases=["GOOGLE_API_KEY", "GEMINI_API_KEY_2"],
         supports_vision=True,
         supports_tools=True,
         supports_json_mode=True,
