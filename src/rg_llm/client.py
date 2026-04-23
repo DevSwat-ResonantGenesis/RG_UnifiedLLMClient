@@ -354,6 +354,8 @@ class UnifiedLLMClient:
                 headers=headers,
                 json=payload,
             )
+            if resp.status_code >= 400:
+                logger.error(f"[LLM] {config.id} HTTP {resp.status_code}: {resp.text[:300]}")
             resp.raise_for_status()
             data = resp.json()
 

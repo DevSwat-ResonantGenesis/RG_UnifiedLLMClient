@@ -71,6 +71,17 @@ def build_provider_chain(
     user_keys = user_keys or {}
     fallback_order = fallback_order or DEFAULT_FALLBACK_ORDER
 
+    # Strip provider prefix from model name (e.g. "groq/llama-3.3-70b" → "llama-3.3-70b")
+    if preferred_model and "/" in preferred_model:
+        parts = preferred_model.split("/", 1)
+        prefix_lower = parts[0].lower()
+        all_ids = {p.lower() for p in (providers or {})}
+        all_ids.update(PROVIDER_ALIASES.keys())
+        if prefix_lower in all_ids:
+            if not preferred_provider:
+                preferred_provider = parts[0]
+            preferred_model = parts[1]
+
     def _normalize(name: str) -> str:
         return PROVIDER_ALIASES.get(name.lower(), name.lower())
 
