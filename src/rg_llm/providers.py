@@ -7,6 +7,25 @@ Every surface in the platform imports from here — no more hardcoded constants.
 from .models import ProviderConfig, ProviderType
 
 BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
+    # ── Tier 0: Unified router (single key → all models) ──
+    "tokenrouter": ProviderConfig(
+        id="tokenrouter",
+        name="TokenRouter",
+        api_type=ProviderType.OPENAI_COMPATIBLE,
+        base_url="https://api.tokenrouter.com/v1",
+        default_model="anthropic/claude-opus-4.7",
+        models=[
+            "openai/gpt-5.5",
+            "anthropic/claude-opus-4.7",
+            "google/gemini-3.1-pro-preview",
+            "z-ai/glm-5.1",
+            "qwen/qwen3.6-plus",
+        ],
+        env_key_name="TOKENROUTER_API_KEY",
+        supports_vision=True,
+        supports_tools=True,
+        supports_json_mode=True,
+    ),
     # ── Tier 1: Primary providers ──
     "openai": ProviderConfig(
         id="openai",
@@ -176,6 +195,7 @@ PROVIDER_ALIASES: dict[str, str] = {
 
 # Default fallback order when no provider is specified
 DEFAULT_FALLBACK_ORDER: list[str] = [
+    "tokenrouter",
     "openai",
     "anthropic",
     "groq",
