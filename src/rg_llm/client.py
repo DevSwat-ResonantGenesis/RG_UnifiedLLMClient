@@ -338,9 +338,12 @@ class UnifiedLLMClient:
         payload: Dict[str, Any] = {
             "model": model,
             "messages": request.messages,
-            "temperature": request.temperature,
             "max_tokens": request.max_tokens,
         }
+        # Some routed models (e.g. TokenRouter Claude) reject temperature
+        model_lower = model.lower()
+        if not (config.id == "tokenrouter" and ("anthropic" in model_lower or "claude" in model_lower)):
+            payload["temperature"] = request.temperature
         if request.tools and config.supports_tools:
             payload["tools"] = request.tools
             if request.tool_choice:
