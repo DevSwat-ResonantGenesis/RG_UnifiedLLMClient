@@ -1,11 +1,11 @@
-"""API key resolution — BYOK dual-key + environment fallback.
+"""API key resolution — system-first + BYOK fallback.
 
 For each provider, we try up to TWO keys in order:
-  1. User's BYOK key (if provided)
-  2. System/platform key (from env vars)
+  1. System/platform key (from env vars) — platform pays first
+  2. User's BYOK key (if provided) — user key as fallback
 
-This ensures that if one key is expired or rate-limited, the other still
-gets tried before falling back to a different provider entirely.
+This ensures the platform key is always tried first, and the user's
+BYOK key is only used if the system key fails or is missing.
 """
 
 from __future__ import annotations
@@ -25,13 +25,10 @@ def resolve_api_key(
 ) -> Optional[str]:
     """Get the best available API key for a provider.
 
-    Returns the BYOK key if available, otherwise the system env key.
+    Returns the system env key first (platform pays), then BYOK fallback.
     Returns None if no key is available.
     """
-    if user_keys:
-        byok = user_keys.get(provider.id, "")
-        if byok:
-            return byok
+    # 1. System key first (platform pays)
     if provider.env_key_name:
         env_val = os.getenv(provider.env_key_name, "")
         # Handle comma-separated keys (e.g. GROQ_API_KEY=key1,key2)
@@ -40,6 +37,11 @@ def resolve_api_key(
                 k = k.strip()
                 if k:
                     return k
+    # 2. BYOK fallback
+    if user_keys:
+        byok = user_keys.get(provider.id, "")
+        if byok:
+            return byok
     return None
 
 
@@ -49,16 +51,21 @@ def build_provider_chain(
     preferred_model: Optional[str] = None,
     user_keys: Optional[Dict[str, str]] = None,
     fallback_order: Optional[List[str]] = None,
+    strict_provider: bool = False,
 ) -> List[Tuple[ProviderConfig, str, str]]:
     """Build an ordered list of (provider_config, model, api_key) to try.
 
-    For each provider we add up to TWO entries: BYOK key first, then
-    system key. This ensures that if one key is expired / rate-limited,
-    the other still gets tried.
+    For each provider we add up to TWO entries: system key first, then
+    BYOK key. This ensures the platform key is always tried first.
 
     Order:
-      1. Preferred provider (BYOK → system)
-      2. Other providers in fallback order (BYOK → system each)
+      1. Preferred provider (system → BYOK)
+      2. Other providers in fallback order (system → BYOK each)
+         — skipped if strict_provider=True and preferred_provider is set
+
+    Args:
+        strict_provider: If True and preferred_provider is set, only try
+            that one provider (no fallback to other providers).
 
     Returns:
         List of (ProviderConfig, model, api_key) tuples.
@@ -92,14 +99,11 @@ def build_provider_chain(
         seen_keys.add((config.id, key))
 
     def _add_both_keys(config: ProviderConfig, model: str) -> None:
-        """Add BYOK key first, then ALL system keys — multi-key resolution.
+        """Add system keys first, then BYOK key — platform pays first.
 
-        Checks env_key_name and env_key_aliases for additional keys.
+        Checks env_key_name and env_key_aliases for system keys.
         """
-        byok = user_keys.get(config.id, "")
-        _add(config, model, byok)
-
-        # Collect keys from primary env var + all alias env vars
+        # 1. System keys first (platform pays)
         env_names = []
         if config.env_key_name:
             env_names.append(config.env_key_name)
@@ -113,6 +117,10 @@ def build_provider_chain(
                     if sys_key:
                         _add(config, model, sys_key)
 
+        # 2. BYOK key as fallback
+        byok = user_keys.get(config.id, "")
+        _add(config, model, byok)
+
     # 1. Preferred provider first
     if preferred_provider:
         prov_id = _normalize(preferred_provider)
@@ -121,12 +129,15 @@ def build_provider_chain(
             model = preferred_model or config.default_model
             _add_both_keys(config, model)
 
+    # If strict mode and we have a preferred provider, stop here — no fallback
+    if strict_provider and preferred_provider:
+        return chain
+
     # 2. Remaining providers in fallback order
     for prov_id in fallback_order:
         config = providers.get(prov_id)
         if not config:
             continue
-        # Skip if already added as preferred
         model = config.default_model
         _add_both_keys(config, model)
 

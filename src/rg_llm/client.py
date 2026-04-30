@@ -128,12 +128,16 @@ class UnifiedLLMClient:
             except Exception as e:
                 logger.warning(f"BYOK fetch failed for user {request.user_id}: {e}")
 
+        # When user explicitly selects a provider, strict mode = no fallback
+        strict = bool(request.provider)
+
         chain = build_provider_chain(
             providers=self.providers,
             preferred_provider=request.provider,
             preferred_model=request.model,
             user_keys=user_keys,
             fallback_order=self.fallback_order,
+            strict_provider=strict,
         )
 
         if not chain:
@@ -250,12 +254,16 @@ class UnifiedLLMClient:
             except Exception as e:
                 logger.warning(f"BYOK fetch failed: {e}")
 
+        # When user explicitly selects a provider, strict mode = no fallback
+        strict = bool(request.provider)
+
         chain = build_provider_chain(
             providers=self.providers,
             preferred_provider=request.provider,
             preferred_model=request.model,
             user_keys=user_keys,
             fallback_order=self.fallback_order,
+            strict_provider=strict,
         )
 
         if not chain:
