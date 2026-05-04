@@ -79,14 +79,15 @@ def build_provider_chain(
     fallback_order = fallback_order or DEFAULT_FALLBACK_ORDER
 
     # Strip provider prefix from model name (e.g. "groq/llama-3.3-70b" → "llama-3.3-70b")
-    if preferred_model and "/" in preferred_model:
+    # Only when no provider is explicitly set — otherwise the slash may be part
+    # of the model name itself (e.g. TokenRouter's "anthropic/claude-opus-4.7").
+    if preferred_model and "/" in preferred_model and not preferred_provider:
         parts = preferred_model.split("/", 1)
         prefix_lower = parts[0].lower()
         all_ids = {p.lower() for p in (providers or {})}
         all_ids.update(PROVIDER_ALIASES.keys())
         if prefix_lower in all_ids:
-            if not preferred_provider:
-                preferred_provider = parts[0]
+            preferred_provider = parts[0]
             preferred_model = parts[1]
 
     def _normalize(name: str) -> str:
