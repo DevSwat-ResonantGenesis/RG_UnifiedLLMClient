@@ -33,7 +33,15 @@ from .models import (
     StreamEventType,
     ToolCall,
 )
-from .providers import BUILTIN_PROVIDERS, PROVIDER_ALIASES
+from .providers import (
+    BUILTIN_PROVIDERS,
+    PROVIDER_ALIASES,
+    TOKENROUTER_SMART_ROUTING,
+    TOKENROUTER_TEXT_MODELS,
+    TOKENROUTER_IMAGE_MODELS,
+    TOKENROUTER_VIDEO_MODELS,
+    TOKENROUTER_AUDIO_MODELS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -765,10 +773,13 @@ class UnifiedLLMClient:
         payload: Dict[str, Any] = {
             "model": model,
             "messages": request.messages,
-            "temperature": request.temperature,
             "max_tokens": request.max_tokens,
             "stream": True,
         }
+        # Some routed models (e.g. TokenRouter Claude) reject temperature
+        model_lower = model.lower()
+        if not (config.id == "tokenrouter" and ("anthropic" in model_lower or "claude" in model_lower)):
+            payload["temperature"] = request.temperature
         if request.tools and config.supports_tools:
             payload["tools"] = request.tools
             if request.tool_choice:
@@ -974,3 +985,129 @@ class UnifiedLLMClient:
             model=model,
             usage=usage,
         )
+
+    # ──────────────────────────────────────────────
+    # Smart Routing: auto-select best model for task
+    # ──────────────────────────────────────────────
+
+    @staticmethod
+    def classify_task(message: str) -> str:
+        """Classify a user message into a task type for smart routing.
+
+        Returns one of: simple, chat, reasoning, coding, coding_simple, coding_complex,
+                        image, image_fast, video, video_fast, audio, audio_fast, vision, free
+        """
+        msg_lower = message.lower()
+
+        # Image generation
+        if any(kw in msg_lower for kw in ["generate image", "create image", "draw", "illustration", "picture of", "photo of", "design a logo", "make a poster"]):
+            if len(message) < 100:
+                return "image_fast"
+            return "image"
+
+        # Video generation
+        if any(kw in msg_lower for kw in ["generate video", "create video", "make a video", "animate", "video of"]):
+            if "fast" in msg_lower or "quick" in msg_lower:
+                return "video_fast"
+            return "video"
+
+        # Audio generation
+        if any(kw in msg_lower for kw in ["generate audio", "create audio", "text to speech", "tts", "voice", "read aloud", "narrate"]):
+            if "fast" in msg_lower or "quick" in msg_lower:
+                return "audio_fast"
+            return "audio"
+
+        # Coding tasks
+        if any(kw in msg_lower for kw in ["write code", "implement", "function", "class ", "def ", "const ", "import ", "debug", "fix bug", "refactor", "typescript", "python", "javascript", "react", "api endpoint"]):
+            if len(message) > 500 or any(kw in msg_lower for kw in ["complex", "architect", "system design", "full stack"]):
+                return "coding_complex"
+            if len(message) < 80:
+                return "coding_simple"
+            return "coding"
+
+        # Reasoning tasks
+        if any(kw in msg_lower for kw in ["explain why", "analyze", "compare", "evaluate", "think step", "reason about", "what are the implications", "pros and cons"]):
+            return "reasoning"
+
+        # Simple Q&A
+        if len(message) < 50 and "?" in message:
+            return "simple"
+
+        # Default: conversational
+        return "chat"
+
+    async def smart_complete(
+        self,
+        request: LLMRequest,
+        user_keys: Optional[Dict[str, str]] = None,
+        task_type: Optional[str] = None,
+    ) -> LLMResponse:
+        """Complete with automatic smart model routing based on task type.
+
+        If task_type is not provided, classifies the last user message.
+        Uses TOKENROUTER_SMART_ROUTING to pick the best model for cost/quality.
+        Falls back to normal complete() if tokenrouter is not available.
+        """
+        if not task_type and request.messages:
+            last_user = next(
+                (m["content"] for m in reversed(request.messages) if m.get("role") == "user"),
+                "",
+            )
+            task_type = self.classify_task(last_user)
+
+        if task_type and task_type in TOKENROUTER_SMART_ROUTING:
+            smart_model = TOKENROUTER_SMART_ROUTING[task_type]
+            request.model = smart_model
+            request.provider = "tokenrouter"
+            logger.info(f"[LLM-smart] Task={task_type} → model={smart_model}")
+
+        return await self.complete(request, user_keys=user_keys)
+
+    # ──────────────────────────────────────────────
+    # Parallel Execution: run multiple models concurrently
+    # ──────────────────────────────────────────────
+
+    async def parallel_complete(
+        self,
+        requests: List[LLMRequest],
+        user_keys: Optional[Dict[str, str]] = None,
+    ) -> List[LLMResponse]:
+        """Execute multiple LLM requests in parallel.
+
+        Useful for:
+        - Text + image generation simultaneously
+        - Multi-model voting/comparison
+        - Generating different media types concurrently
+
+        Args:
+            requests: List of LLMRequest objects (can target different models/providers)
+            user_keys: Shared BYOK keys for all requests
+
+        Returns:
+            List of LLMResponse objects in same order as requests.
+            Failed requests return LLMResponse with error content.
+        """
+        async def _safe_complete(req: LLMRequest) -> LLMResponse:
+            try:
+                return await self.complete(req, user_keys=user_keys)
+            except Exception as e:
+                logger.error(f"[LLM-parallel] Failed: {e}")
+                return LLMResponse(
+                    content=f"Error: {str(e)}",
+                    provider=req.provider or "unknown",
+                    model=req.model or "unknown",
+                )
+
+        results = await asyncio.gather(*[_safe_complete(r) for r in requests])
+        return list(results)
+
+    @staticmethod
+    def get_model_category(model: str) -> str:
+        """Get the category of a model (text, image, video, audio)."""
+        if model in TOKENROUTER_IMAGE_MODELS:
+            return "image"
+        if model in TOKENROUTER_VIDEO_MODELS:
+            return "video"
+        if model in TOKENROUTER_AUDIO_MODELS:
+            return "audio"
+        return "text"

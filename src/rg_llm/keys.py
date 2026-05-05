@@ -81,14 +81,19 @@ def build_provider_chain(
     # Strip provider prefix from model name (e.g. "groq/llama-3.3-70b" → "llama-3.3-70b")
     # Only when no provider is explicitly set — otherwise the slash may be part
     # of the model name itself (e.g. TokenRouter's "anthropic/claude-opus-4.7").
+    # If the full model name exists in TokenRouter's catalog, route to tokenrouter instead.
     if preferred_model and "/" in preferred_model and not preferred_provider:
-        parts = preferred_model.split("/", 1)
-        prefix_lower = parts[0].lower()
-        all_ids = {p.lower() for p in (providers or {})}
-        all_ids.update(PROVIDER_ALIASES.keys())
-        if prefix_lower in all_ids:
-            preferred_provider = parts[0]
-            preferred_model = parts[1]
+        from .providers import TOKENROUTER_ALL_MODELS
+        if preferred_model in TOKENROUTER_ALL_MODELS:
+            preferred_provider = "tokenrouter"
+        else:
+            parts = preferred_model.split("/", 1)
+            prefix_lower = parts[0].lower()
+            all_ids = {p.lower() for p in (providers or {})}
+            all_ids.update(PROVIDER_ALIASES.keys())
+            if prefix_lower in all_ids:
+                preferred_provider = parts[0]
+                preferred_model = parts[1]
 
     def _normalize(name: str) -> str:
         return PROVIDER_ALIASES.get(name.lower(), name.lower())
