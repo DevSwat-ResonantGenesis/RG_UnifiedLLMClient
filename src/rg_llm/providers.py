@@ -7,86 +7,39 @@ Every surface in the platform imports from here — no more hardcoded constants.
 from .models import ProviderConfig, ProviderType
 
 
-# ── TokenRouter Model Catalog (72 models, categorized) ──
+# ── TokenRouter Model Catalog (verified working models only) ──
 TOKENROUTER_TEXT_MODELS: list[str] = [
     # Premium reasoning
     "anthropic/claude-opus-4.7",
-    "anthropic/claude-opus-4.6",
-    "anthropic/claude-opus-4.5",
-    "anthropic/claude-sonnet-4.6",
-    "anthropic/claude-sonnet-4.5",
     "anthropic/claude-sonnet-4",
-    "anthropic/claude-haiku-4.5",
-    "openai/gpt-5.5",
-    "openai/gpt-5.4",
-    "openai/gpt-5.2",
-    "openai/gpt-5-mini",
     "openai/gpt-4o-mini",
     "x-ai/grok-4.3",
-    "x-ai/grok-4.20-beta",
-    "x-ai/grok-4.1-fast",
     "google/gemini-3.1-pro-preview",
     "google/gemini-3-flash-preview",
     "deepseek/deepseek-v4-pro",
     "deepseek/deepseek-v4-flash",
-    "deepseek/deepseek-v3.2",
-    "z-ai/glm-5.1",
     "z-ai/glm-5",
-    "z-ai/glm-5-turbo",
-    "z-ai/glm-4.7",
-    "z-ai/glm-4.6",
     "z-ai/glm-4.6v",
-    "z-ai/glm-4.5-air",
     "qwen/qwen3.6-plus",
-    "qwen/qwen3.5-plus-02-15",
     "qwen/qwen3.5-flash",
-    "qwen/qwen3.5-397b-a17b",
-    "qwen/qwen3.5-122b-a10b",
-    "qwen/qwen3.5-35b-a3b",
-    "qwen/qwen3.5-9b",
     "moonshotai/kimi-k2.6",
-    "moonshotai/kimi-k2.5",
     "minimax/minimax-m2.7",
-    "minimax/minimax-m2.7-highspeed",
-    "minimax/minimax-m2.5",
-    "minimax/minimax-m2.1",
-    "minimax/minimax-m2.1-highspeed",
-    "minimax/minimax-m2-her",
     "xiaomi/mimo-v2.5-pro",
-    "xiaomi/mimo-v2.5",
-    "xiaomi/mimo-v2-pro",
-    "xiaomi/mimo-v2-omni",
-    "xiaomi/mimo-v2-flash",
     "stepfun/step-3.5-flash",
-    "mistralai/devstral-2512",
-    "nvidia/nemotron-3-super-120b-a12b",
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
     # Coding specialists
-    "openai/gpt-5.3-codex",
-    "openai/gpt-5.2-codex",
-    "openai/gpt-5.1-codex-max",
-    "openai/gpt-5.1-codex-mini",
     "qwen/qwen3-coder-next",
 ]
 
 TOKENROUTER_IMAGE_MODELS: list[str] = [
-    "openai/gpt-5.4-image-2",
     "openai/gpt-5-image",
     "openai/gpt-5-image-mini",
     "google/gemini-3.1-flash-image-preview",
-    "google/gemini-3-pro-image-preview",
-    "google/gemini-2.5-flash-image",
-    "bytedance-seed/seedream-4.5",
 ]
 
 TOKENROUTER_VIDEO_MODELS: list[str] = [
-    "happyhorse-1.0-i2v",
-    "happyhorse-1.0-t2v",
-    "dreamina-seedance-2-0-260128",
-    "dreamina-seedance-2-0-fast-260128",
     "kling-v3",
     "kling-v2-6",
-    "MiniMax-Hailuo-2.3",
 ]
 
 TOKENROUTER_AUDIO_MODELS: list[str] = [
@@ -106,16 +59,13 @@ TOKENROUTER_SMART_ROUTING: dict[str, str] = {
     "simple": "qwen/qwen3.5-flash",                     # Cheapest text
     "chat": "deepseek/deepseek-v4-flash",                # Fast conversational
     "reasoning": "anthropic/claude-opus-4.7",            # Best reasoning
-    "coding": "openai/gpt-5.3-codex",                   # Code specialist
-    "coding_simple": "openai/gpt-5.1-codex-mini",       # Quick code
-    "coding_complex": "openai/gpt-5.1-codex-max",       # Complex code
-    "image": "openai/gpt-5-image",                       # Image generation
+    "coding": "qwen/qwen3-coder-next",                  # Code specialist
+    "image": "openai/gpt-5-image",                      # Image generation
     "image_fast": "openai/gpt-5-image-mini",             # Quick image
-    "video": "kling-v3",                                  # Video generation
-    "video_fast": "dreamina-seedance-2-0-fast-260128",   # Quick video
-    "audio": "openai/gpt-audio",                          # Audio generation
+    "video": "kling-v3",                                 # Video generation
+    "audio": "openai/gpt-audio",                         # Audio generation
     "audio_fast": "openai/gpt-audio-mini",               # Quick audio
-    "vision": "z-ai/glm-4.6v",                           # Vision/multimodal
+    "vision": "z-ai/glm-4.6v",                          # Vision/multimodal
     "free": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",  # Free tier
 }
 
