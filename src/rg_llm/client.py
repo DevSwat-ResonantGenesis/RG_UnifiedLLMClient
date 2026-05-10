@@ -136,7 +136,7 @@ class UnifiedLLMClient:
             except Exception as e:
                 logger.warning(f"BYOK fetch failed for user {request.user_id}: {e}")
 
-        # When user explicitly selects a provider, strict mode = no fallback
+        # When user explicitly selects a provider, try strict mode first
         strict = bool(request.provider)
 
         chain = build_provider_chain(
@@ -147,6 +147,19 @@ class UnifiedLLMClient:
             fallback_order=self.fallback_order,
             strict_provider=strict,
         )
+
+        # If strict mode returned empty chain (preferred provider has no key),
+        # fall back to non-strict mode so other providers can be tried
+        if not chain and strict:
+            logger.warning(f"Preferred provider '{request.provider}' has no API key, falling back to any available provider")
+            chain = build_provider_chain(
+                providers=self.providers,
+                preferred_provider=request.provider,
+                preferred_model=None,
+                user_keys=user_keys,
+                fallback_order=self.fallback_order,
+                strict_provider=False,
+            )
 
         if not chain:
             return LLMResponse(
@@ -262,7 +275,7 @@ class UnifiedLLMClient:
             except Exception as e:
                 logger.warning(f"BYOK fetch failed: {e}")
 
-        # When user explicitly selects a provider, strict mode = no fallback
+        # When user explicitly selects a provider, try strict mode first
         strict = bool(request.provider)
 
         chain = build_provider_chain(
@@ -273,6 +286,18 @@ class UnifiedLLMClient:
             fallback_order=self.fallback_order,
             strict_provider=strict,
         )
+
+        # If strict mode returned empty chain, fall back to non-strict
+        if not chain and strict:
+            logger.warning(f"Preferred provider '{request.provider}' has no API key, falling back to any available provider")
+            chain = build_provider_chain(
+                providers=self.providers,
+                preferred_provider=request.provider,
+                preferred_model=None,
+                user_keys=user_keys,
+                fallback_order=self.fallback_order,
+                strict_provider=False,
+            )
 
         if not chain:
             yield LLMStreamEvent(event=StreamEventType.ERROR, error="No providers available")
