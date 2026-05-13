@@ -51,7 +51,7 @@ DEFAULT_TIMEOUT = 120.0
 # Retry config for rate-limited requests (429)
 MAX_RETRIES_429 = 3
 BASE_BACKOFF_SECONDS = 1.0  # 1s, 2s, 4s
-PROVIDER_COOLDOWN_SECONDS = 30  # Skip provider for 30s after auth failure
+PROVIDER_COOLDOWN_SECONDS = 10  # Skip specific key for 10s after definitive auth failure
 
 
 class UnifiedLLMClient:
@@ -226,14 +226,22 @@ class UnifiedLLMClient:
     # ──────────────────────────────────────────────
 
     def _is_provider_cooled_down(self, provider_key: str) -> bool:
-        """Check if a provider is in cooldown after a permanent failure (401, etc)."""
+        """Check if a specific provider+key combo is in cooldown.
+        
+        Cooldown is per provider_key (provider_id:key_prefix), not per
+        provider_id alone. This ensures a bad system key doesn't block
+        a valid BYOK key for the same provider.
+        """
         last_fail = self._provider_errors.get(provider_key, 0)
         if last_fail and (time.time() - last_fail) < PROVIDER_COOLDOWN_SECONDS:
             return True
+        # Expire old entries
+        if last_fail and (time.time() - last_fail) >= PROVIDER_COOLDOWN_SECONDS:
+            self._provider_errors.pop(provider_key, None)
         return False
 
     def _mark_provider_failed(self, provider_key: str, permanent: bool = False) -> None:
-        """Mark a provider as failed. Permanent failures (401) trigger cooldown."""
+        """Mark a specific key as failed. Only definitive auth failures trigger cooldown."""
         if permanent:
             self._provider_errors[provider_key] = time.time()
             logger.warning(f"[LLM] {provider_key} marked as failed (cooldown {PROVIDER_COOLDOWN_SECONDS}s)")
@@ -252,11 +260,21 @@ class UnifiedLLMClient:
 
     @staticmethod
     def _is_auth_failure(exc: Exception) -> bool:
-        """Check if an HTTP error is a permanent auth failure (401/403)."""
+        """Check if an HTTP error is a DEFINITIVE auth failure (invalid API key).
+        
+        Only returns True for clear "bad key" responses, NOT for transient
+        issues like quota exceeded or temporary 403s from rate limiting.
+        """
         if isinstance(exc, httpx.HTTPStatusError):
-            return exc.response.status_code in (401, 403)
+            status = exc.response.status_code
+            if status == 401:
+                # Only cooldown if the body indicates a permanent key issue
+                body = exc.response.text.lower() if hasattr(exc.response, 'text') else ""
+                permanent_indicators = ["invalid_api_key", "invalid api key", "incorrect api key", "api key not found"]
+                return any(ind in body for ind in permanent_indicators)
+            return False  # Don't cooldown on 403 (often transient: quota, rate limit)
         err_str = str(exc).lower()
-        return "401" in err_str or "unauthorized" in err_str or "forbidden" in err_str
+        return "invalid_api_key" in err_str or "invalid api key" in err_str or "incorrect api key" in err_str
 
     async def stream(
         self,
