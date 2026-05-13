@@ -416,11 +416,53 @@ class UnifiedLLMClient:
                     arguments=tc["function"].get("arguments", "{}"),
                 ))
 
+        # Extract content — handle multimodal responses (image models)
+        content = msg.get("content", "") or ""
+
+        # Handle image model responses (e.g. GPT-5-image, Gemini Flash Image)
+        # These return images in msg["images"] with content=null
+        response_images: list = []
+        raw_images = msg.get("images") or []
+        if raw_images:
+            image_parts = []
+            for img in raw_images:
+                if isinstance(img, dict):
+                    img_type = img.get("type", "")
+                    if img_type == "image_url":
+                        url = (img.get("image_url") or {}).get("url", "")
+                        if url:
+                            response_images.append({"url": url})
+                            image_parts.append(f"![Generated Image]({url})")
+                    elif img.get("url"):
+                        response_images.append({"url": img["url"]})
+                        image_parts.append(f"![Generated Image]({img['url']})")
+                    elif img.get("b64_json"):
+                        data_url = f"data:image/png;base64,{img['b64_json']}"
+                        response_images.append({"url": data_url, "b64_json": img["b64_json"]})
+                        image_parts.append(f"![Generated Image]({data_url})")
+            if image_parts and not content:
+                content = "\n".join(image_parts)
+
+        # If content is a list (multimodal array), flatten to text + images
+        if isinstance(msg.get("content"), list):
+            parts = []
+            for block in msg["content"]:
+                if isinstance(block, dict):
+                    if block.get("type") == "text":
+                        parts.append(block.get("text", ""))
+                    elif block.get("type") == "image_url":
+                        url = (block.get("image_url") or {}).get("url", "")
+                        if url:
+                            response_images.append({"url": url})
+                            parts.append(f"![Generated Image]({url})")
+            content = "\n".join(parts)
+
         return LLMResponse(
-            content=msg.get("content", "") or "",
+            content=content,
             provider=config.id,
             model=data.get("model", model),
             tool_calls=tool_calls,
+            images=response_images,
             usage={
                 "prompt_tokens": usage.get("prompt_tokens", 0),
                 "completion_tokens": usage.get("completion_tokens", 0),

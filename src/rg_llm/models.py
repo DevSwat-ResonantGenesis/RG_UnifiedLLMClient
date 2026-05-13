@@ -63,6 +63,7 @@ class LLMResponse:
     provider: str = ""
     model: str = ""
     tool_calls: List[ToolCall] = field(default_factory=list)
+    images: List[Dict[str, Any]] = field(default_factory=list)
     usage: Dict[str, int] = field(default_factory=dict)
     fallback_chain: List[Dict[str, str]] = field(default_factory=list)
     was_fallback: bool = False
