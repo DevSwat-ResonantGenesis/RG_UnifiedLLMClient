@@ -102,12 +102,12 @@ BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
         name="Anthropic",
         api_type=ProviderType.ANTHROPIC,
         base_url="https://api.anthropic.com/v1",
-        default_model="claude-sonnet-4-20250514",
-        models=["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
+        default_model="claude-3-5-sonnet-20241022",
+        models=["claude-opus-4-5-20251101", "claude-sonnet-4-5-20251022", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-haiku-20240307"],
         env_key_name="ANTHROPIC_API_KEY",
         supports_vision=True,
         supports_tools=True,
-        supports_json_mode=False,  # Anthropic uses prefill, not response_format
+        supports_json_mode=False,
     ),
     "groq": ProviderConfig(
         id="groq",
