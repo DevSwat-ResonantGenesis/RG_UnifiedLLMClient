@@ -1,11 +1,11 @@
-"""API key resolution — system-first + BYOK fallback.
+"""API key resolution — BYOK-first + system fallback.
 
 For each provider, we try up to TWO keys in order:
-  1. System/platform key (from env vars) — platform pays first
-  2. User's BYOK key (if provided) — user key as fallback
+  1. User's BYOK key (if provided) — user's own key takes priority
+  2. System/platform key (from env vars) — fallback when no user key
 
-This ensures the platform key is always tried first, and the user's
-BYOK key is only used if the system key fails or is missing.
+This ensures users who bring their own key always use it, and the
+platform key only fires when the user has no key for that provider.
 """
 
 from __future__ import annotations
@@ -25,23 +25,22 @@ def resolve_api_key(
 ) -> Optional[str]:
     """Get the best available API key for a provider.
 
-    Returns the system env key first (platform pays), then BYOK fallback.
+    Returns the user's BYOK key first, then system env key as fallback.
     Returns None if no key is available.
     """
-    # 1. System key first (platform pays)
+    # 1. BYOK key first (user's own key takes priority)
+    if user_keys:
+        byok = user_keys.get(provider.id, "")
+        if byok:
+            return byok
+    # 2. System key fallback (platform pays when user has no key)
     if provider.env_key_name:
         env_val = os.getenv(provider.env_key_name, "")
-        # Handle comma-separated keys (e.g. GROQ_API_KEY=key1,key2)
         if env_val:
             for k in env_val.split(","):
                 k = k.strip()
                 if k:
                     return k
-    # 2. BYOK fallback
-    if user_keys:
-        byok = user_keys.get(provider.id, "")
-        if byok:
-            return byok
     return None
 
 
@@ -105,11 +104,15 @@ def build_provider_chain(
         seen_keys.add((config.id, key))
 
     def _add_both_keys(config: ProviderConfig, model: str) -> None:
-        """Add system keys first, then BYOK key — platform pays first.
+        """Add BYOK key first, then system keys as fallback.
 
         Checks env_key_name and env_key_aliases for system keys.
         """
-        # 1. System keys first (platform pays)
+        # 1. BYOK key first (user's own key takes priority)
+        byok = user_keys.get(config.id, "")
+        _add(config, model, byok)
+
+        # 2. System keys as fallback (platform pays when user has no key)
         env_names = []
         if config.env_key_name:
             env_names.append(config.env_key_name)
@@ -122,10 +125,6 @@ def build_provider_chain(
                     sys_key = sys_key.strip()
                     if sys_key:
                         _add(config, model, sys_key)
-
-        # 2. BYOK key as fallback
-        byok = user_keys.get(config.id, "")
-        _add(config, model, byok)
 
     # 1. Preferred provider first
     if preferred_provider:
