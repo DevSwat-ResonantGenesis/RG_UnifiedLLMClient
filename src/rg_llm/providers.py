@@ -102,7 +102,7 @@ BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
         name="Anthropic",
         api_type=ProviderType.ANTHROPIC,
         base_url="https://api.anthropic.com/v1",
-        default_model="claude-3-5-sonnet-20241022",
+        default_model="claude-sonnet-4-5-20251022",
         models=["claude-opus-4-5-20251101", "claude-sonnet-4-5-20251022", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-haiku-20240307"],
         env_key_name="ANTHROPIC_API_KEY",
         supports_vision=True,
@@ -224,7 +224,7 @@ BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
         id="bedrock",
         name="AWS Bedrock",
         api_type=ProviderType.OPENAI_COMPATIBLE,
-        base_url="https://bedrock-runtime.us-east-2.amazonaws.com/v1",
+        base_url="https://bedrock-runtime.us-east-2.amazonaws.com/openai/v1",
         default_model="anthropic.claude-3-5-sonnet-20241022-v2:0",
         models=[
             "anthropic.claude-3-5-sonnet-20241022-v2:0",
