@@ -23,6 +23,7 @@ class ProviderConfig:
     base_url: str
     default_model: str
     models: List[str] = field(default_factory=list)
+    model_costs: Dict[str, float] = field(default_factory=dict)  # input $/MTok, for cheapest-default ranking
     env_key_name: str = ""
     env_key_aliases: List[str] = field(default_factory=list)  # Additional env vars to check for keys
     headers: Dict[str, str] = field(default_factory=dict)
