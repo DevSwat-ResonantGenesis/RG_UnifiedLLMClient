@@ -52,6 +52,7 @@ def build_provider_chain(
     user_keys: Optional[Dict[str, str]] = None,
     fallback_order: Optional[List[str]] = None,
     strict_provider: bool = False,
+    prefer_tool_model: bool = False,
 ) -> List[Tuple[ProviderConfig, str, str]]:
     """Build an ordered list of (provider_config, model, api_key) to try.
 
@@ -66,6 +67,11 @@ def build_provider_chain(
     Args:
         strict_provider: If True and preferred_provider is set, only try
             that one provider (no fallback to other providers).
+        prefer_tool_model: If True and no explicit preferred_model is set,
+            use each provider's tool_model (falling back to default_model
+            if unset) instead of default_model. default_model is picked
+            for raw cost, which isn't always reliable at invoking tools —
+            callers passing `tools` on the request should set this.
 
     Returns:
         List of (ProviderConfig, model, api_key) tuples.
@@ -97,6 +103,11 @@ def build_provider_chain(
 
     def _normalize(name: str) -> str:
         return PROVIDER_ALIASES.get(name.lower(), name.lower())
+
+    def _default_for(config: ProviderConfig) -> str:
+        if prefer_tool_model and config.tool_model:
+            return config.tool_model
+        return config.default_model
 
     def _add(config: ProviderConfig, model: str, key: str) -> None:
         if not key or (config.id, key) in seen_keys:
@@ -132,7 +143,7 @@ def build_provider_chain(
         prov_id = _normalize(preferred_provider)
         config = providers.get(prov_id)
         if config:
-            model = preferred_model or config.default_model
+            model = preferred_model or _default_for(config)
             _add_both_keys(config, model)
 
     # If strict mode and we have a preferred provider, stop here — no fallback
@@ -144,7 +155,7 @@ def build_provider_chain(
         config = providers.get(prov_id)
         if not config:
             continue
-        model = config.default_model
+        model = _default_for(config)
         _add_both_keys(config, model)
 
     # 3. Any provider with a user BYOK key not yet in the chain
@@ -153,6 +164,6 @@ def build_provider_chain(
             continue
         config = providers.get(_normalize(prov_id))
         if config:
-            _add(config, config.default_model, key)
+            _add(config, _default_for(config), key)
 
     return chain

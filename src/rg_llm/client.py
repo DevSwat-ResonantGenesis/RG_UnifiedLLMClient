@@ -146,6 +146,7 @@ class UnifiedLLMClient:
             user_keys=user_keys,
             fallback_order=self.fallback_order,
             strict_provider=strict,
+            prefer_tool_model=bool(request.tools),
         )
 
         # If strict mode returned empty chain (preferred provider has no key),
@@ -159,6 +160,7 @@ class UnifiedLLMClient:
                 user_keys=user_keys,
                 fallback_order=self.fallback_order,
                 strict_provider=False,
+                prefer_tool_model=bool(request.tools),
             )
 
         if not chain:
@@ -309,6 +311,7 @@ class UnifiedLLMClient:
             user_keys=user_keys,
             fallback_order=self.fallback_order,
             strict_provider=strict,
+            prefer_tool_model=bool(request.tools),
         )
 
         # If strict mode returned empty chain, fall back to non-strict
@@ -321,6 +324,7 @@ class UnifiedLLMClient:
                 user_keys=user_keys,
                 fallback_order=self.fallback_order,
                 strict_provider=False,
+                prefer_tool_model=bool(request.tools),
             )
 
         if not chain:

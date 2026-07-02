@@ -118,6 +118,7 @@ BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
         ),
         models=["claude-opus-4-8", "claude-sonnet-4-6", "claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-haiku-4-5-20251001"],
         model_costs={"claude-opus-4-8": 5.0, "claude-sonnet-4-6": 3.0, "claude-sonnet-4-5-20250929": 3.0, "claude-opus-4-5-20251101": 5.0, "claude-haiku-4-5-20251001": 1.0},
+        tool_model="claude-sonnet-4-6",  # Haiku is unreliable invoking tools for multi-step agentic tasks
         env_key_name="ANTHROPIC_API_KEY",
         supports_vision=True,
         supports_tools=True,
