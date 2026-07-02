@@ -23,7 +23,7 @@ from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 import httpx
 
-from .keys import build_provider_chain
+from .keys import build_provider_chain, resolve_api_key
 from .models import (
     LLMRequest,
     LLMResponse,
@@ -136,8 +136,15 @@ class UnifiedLLMClient:
             except Exception as e:
                 logger.warning(f"BYOK fetch failed for user {request.user_id}: {e}")
 
-        # When user explicitly selects a provider, try strict mode first
-        strict = bool(request.provider)
+        # No-preference default: task-based provider routing (provider-agnostic,
+        # no hardcoded model id). An explicit user provider/model always wins.
+        user_selected_provider = bool(request.provider)
+        if not request.provider and not request.model:
+            _tp = self._task_preferred_provider(request, user_keys)
+            if _tp:
+                request.provider = _tp
+        # Only lock to strict mode when the USER explicitly chose the provider.
+        strict = user_selected_provider
 
         chain = build_provider_chain(
             providers=self.providers,
@@ -332,8 +339,15 @@ class UnifiedLLMClient:
             except Exception as e:
                 logger.warning(f"BYOK fetch failed: {e}")
 
-        # When user explicitly selects a provider, try strict mode first
-        strict = bool(request.provider)
+        # No-preference default: task-based provider routing (provider-agnostic,
+        # no hardcoded model id). An explicit user provider/model always wins.
+        user_selected_provider = bool(request.provider)
+        if not request.provider and not request.model:
+            _tp = self._task_preferred_provider(request, user_keys)
+            if _tp:
+                request.provider = _tp
+        # Only lock to strict mode when the USER explicitly chose the provider.
+        strict = user_selected_provider
 
         chain = build_provider_chain(
             providers=self.providers,
@@ -1145,6 +1159,33 @@ class UnifiedLLMClient:
     # ──────────────────────────────────────────────
     # Smart Routing: auto-select best model for task
     # ──────────────────────────────────────────────
+
+    def _task_preferred_provider(
+        self,
+        request: LLMRequest,
+        user_keys: Optional[Dict[str, str]],
+    ) -> Optional[str]:
+        """No-preference default: pick the best-suited AVAILABLE provider for the
+        task (provider-agnostic, no hardcoded model id — the provider's own
+        computed default_model is used). Returns a provider id or None. Only used
+        when the caller supplied neither an explicit provider nor model."""
+        from .providers import TASK_PROVIDER_PREFERENCE
+        last_user = ""
+        if request.messages:
+            last_user = next(
+                (m.get("content", "") for m in reversed(request.messages)
+                 if m.get("role") == "user"),
+                "",
+            )
+        if not isinstance(last_user, str):
+            last_user = ""
+        task = self.classify_task(last_user)
+        for pid in TASK_PROVIDER_PREFERENCE.get(task, []):
+            cfg = self.providers.get(pid)
+            if cfg and resolve_api_key(cfg, user_keys):
+                logger.info(f"[LLM-task] task={task} -> provider={pid} (its default model)")
+                return pid
+        return None
 
     @staticmethod
     def classify_task(message: str) -> str:

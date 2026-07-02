@@ -76,6 +76,31 @@ TOKENROUTER_SMART_ROUTING: dict[str, str] = {
 }
 
 
+# Provider-agnostic task routing — maps a classify_task() type to an ORDERED
+# list of PROVIDER IDS best suited to it. Provider ids are stable (they don't
+# get retired the way dated model snapshots do), so this never rots; the actual
+# model used is each provider's own computed-cheapest default_model (or its
+# tool_model for tool calls). Used as the no-preference default so we never
+# hardcode a model id in the call path. An explicit user provider/model always
+# takes precedence over this. Only providers with a resolvable key are picked.
+TASK_PROVIDER_PREFERENCE: dict[str, list[str]] = {
+    "simple":          ["groq", "google", "deepseek", "anthropic", "openai", "tokenrouter"],
+    "chat":            ["groq", "google", "anthropic", "openai", "deepseek", "tokenrouter"],
+    "reasoning":       ["anthropic", "openai", "deepseek", "google", "tokenrouter"],
+    "coding":          ["anthropic", "deepseek", "openai", "groq", "tokenrouter"],
+    "coding_simple":   ["deepseek", "groq", "anthropic", "openai", "tokenrouter"],
+    "coding_complex":  ["anthropic", "openai", "deepseek", "openrouter", "tokenrouter"],
+    "vision":          ["anthropic", "openai", "google", "tokenrouter"],
+    "image":           ["openai", "google", "tokenrouter"],
+    "image_fast":      ["openai", "google", "tokenrouter"],
+    "video":           ["tokenrouter"],
+    "video_fast":      ["tokenrouter"],
+    "audio":           ["openai", "tokenrouter"],
+    "audio_fast":      ["openai", "tokenrouter"],
+    "free":            ["groq", "google", "tokenrouter"],
+}
+
+
 BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
     # ── Tier 0: Unified router (single key → all models) ──
     "tokenrouter": ProviderConfig(
