@@ -19,6 +19,11 @@ from .providers import (
     TOKENROUTER_AUDIO_MODELS,
     TOKENROUTER_SMART_ROUTING,
 )
+from .capabilities import (
+    PROVIDER_CAPABILITIES,
+    CAPABILITY_TO_PROVIDER_ORDER,
+    ideal_provider_for,
+)
 
 __all__ = [
     "UnifiedLLMClient",
@@ -36,6 +41,9 @@ __all__ = [
     "TOKENROUTER_VIDEO_MODELS",
     "TOKENROUTER_AUDIO_MODELS",
     "TOKENROUTER_SMART_ROUTING",
+    "PROVIDER_CAPABILITIES",
+    "CAPABILITY_TO_PROVIDER_ORDER",
+    "ideal_provider_for",
 ]
 
 __version__ = "0.1.0"
