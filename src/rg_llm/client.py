@@ -171,51 +171,82 @@ class UnifiedLLMClient:
 
         fallback_chain: List[Dict[str, str]] = []
         last_error = ""
+        tried_provider_keys: set = set()
 
-        for config, model, api_key in chain:
-            provider_key = f"{config.id}:{api_key[:8]}" if api_key else config.id
+        async def _try_chain(chain_to_try) -> Optional[LLMResponse]:
+            nonlocal last_error
+            for config, model, api_key in chain_to_try:
+                provider_key = f"{config.id}:{api_key[:8]}" if api_key else config.id
+                if provider_key in tried_provider_keys:
+                    continue
+                tried_provider_keys.add(provider_key)
 
-            # Skip providers in cooldown (recent 401/403)
-            if self._is_provider_cooled_down(provider_key):
-                logger.info(f"[LLM] Skipping {config.id} (cooldown)")
-                fallback_chain.append({"provider": config.id, "status": "cooldown"})
-                continue
+                # Skip providers in cooldown (recent 401/403)
+                if self._is_provider_cooled_down(provider_key):
+                    logger.info(f"[LLM] Skipping {config.id} (cooldown)")
+                    fallback_chain.append({"provider": config.id, "status": "cooldown"})
+                    continue
 
-            # Retry loop with exponential backoff for 429
-            for attempt in range(MAX_RETRIES_429 + 1):
-                try:
-                    logger.info(f"[LLM] Trying {config.id}/{model}" + (f" (retry {attempt})" if attempt else ""))
-                    response = await self._call_provider(
-                        config=config,
-                        model=model,
-                        api_key=api_key,
-                        request=request,
-                    )
-                    fallback_chain.append({"provider": config.id, "status": "success"})
-                    response.fallback_chain = fallback_chain
-                    response.was_fallback = len(fallback_chain) > 1
-                    self._clear_provider_error(provider_key)
-                    logger.info(
-                        f"[LLM] {config.id}/{model} succeeded "
-                        f"(tokens: {response.usage.get('total_tokens', '?')})"
-                    )
-                    return response
-                except Exception as e:
-                    if self._is_retryable(e) and attempt < MAX_RETRIES_429:
-                        wait = BASE_BACKOFF_SECONDS * (2 ** attempt)
-                        logger.warning(f"[LLM] {config.id} rate-limited (429), retrying in {wait}s...")
-                        await asyncio.sleep(wait)
-                        continue
-                    last_error = str(e)
-                    fallback_chain.append({
-                        "provider": config.id,
-                        "status": "failed",
-                        "reason": last_error[:200],
-                    })
-                    if self._is_auth_failure(e):
-                        self._mark_provider_failed(provider_key, permanent=True)
-                    logger.warning(f"[LLM] {config.id}/{model} failed: {last_error[:100]}")
-                    break  # Move to next provider
+                # Retry loop with exponential backoff for 429
+                for attempt in range(MAX_RETRIES_429 + 1):
+                    try:
+                        logger.info(f"[LLM] Trying {config.id}/{model}" + (f" (retry {attempt})" if attempt else ""))
+                        response = await self._call_provider(
+                            config=config,
+                            model=model,
+                            api_key=api_key,
+                            request=request,
+                        )
+                        fallback_chain.append({"provider": config.id, "status": "success"})
+                        response.fallback_chain = fallback_chain
+                        response.was_fallback = len(fallback_chain) > 1
+                        self._clear_provider_error(provider_key)
+                        logger.info(
+                            f"[LLM] {config.id}/{model} succeeded "
+                            f"(tokens: {response.usage.get('total_tokens', '?')})"
+                        )
+                        return response
+                    except Exception as e:
+                        if self._is_retryable(e) and attempt < MAX_RETRIES_429:
+                            wait = BASE_BACKOFF_SECONDS * (2 ** attempt)
+                            logger.warning(f"[LLM] {config.id} rate-limited (429), retrying in {wait}s...")
+                            await asyncio.sleep(wait)
+                            continue
+                        last_error = str(e)
+                        fallback_chain.append({
+                            "provider": config.id,
+                            "status": "failed",
+                            "reason": last_error[:200],
+                        })
+                        if self._is_auth_failure(e):
+                            self._mark_provider_failed(provider_key, permanent=True)
+                        logger.warning(f"[LLM] {config.id}/{model} failed: {last_error[:100]}")
+                        break  # Move to next provider
+            return None
+
+        response = await _try_chain(chain)
+        if response:
+            return response
+
+        # Strict chain (a specific requested provider) exhausted without
+        # success — expand to every other provider/BYOK key rather than
+        # giving up, so a dead system-only provider (e.g. a shared
+        # TokenRouter key out of credit) can't block valid keys elsewhere
+        # in the chain from ever being tried.
+        if strict:
+            logger.warning(f"[LLM] '{request.provider}' chain exhausted, expanding to full fallback")
+            extended = build_provider_chain(
+                providers=self.providers,
+                preferred_provider=request.provider,
+                preferred_model=None,
+                user_keys=user_keys,
+                fallback_order=self.fallback_order,
+                strict_provider=False,
+                prefer_tool_model=bool(request.tools),
+            )
+            response = await _try_chain(extended)
+            if response:
+                return response
 
         return LLMResponse(
             content=f"All providers failed. Last error: {last_error}",
@@ -331,44 +362,74 @@ class UnifiedLLMClient:
             yield LLMStreamEvent(event=StreamEventType.ERROR, error="No providers available")
             return
 
-        for config, model, api_key in chain:
-            provider_key = f"{config.id}:{api_key[:8]}" if api_key else config.id
+        tried_provider_keys: set = set()
+        succeeded = [False]
 
-            # Skip providers in cooldown (recent 401/403)
-            if self._is_provider_cooled_down(provider_key):
-                logger.info(f"[LLM-stream] Skipping {config.id} (cooldown)")
-                continue
+        async def _try_chain(chain_to_try):
+            for config, model, api_key in chain_to_try:
+                provider_key = f"{config.id}:{api_key[:8]}" if api_key else config.id
+                if provider_key in tried_provider_keys:
+                    continue
+                tried_provider_keys.add(provider_key)
 
-            # Retry loop with exponential backoff for 429
-            for attempt in range(MAX_RETRIES_429 + 1):
-                try:
-                    logger.info(f"[LLM-stream] Trying {config.id}/{model}" + (f" (retry {attempt})" if attempt else ""))
-                    yield LLMStreamEvent(
-                        event=StreamEventType.PROVIDER,
-                        provider=config.id,
-                        model=model,
-                    )
-                    async for event in self._stream_provider(
-                        config=config,
-                        model=model,
-                        api_key=api_key,
-                        request=request,
-                    ):
-                        yield event
-                    self._clear_provider_error(provider_key)
-                    return  # Success — stop trying providers
-                except Exception as e:
-                    if self._is_retryable(e) and attempt < MAX_RETRIES_429:
-                        wait = BASE_BACKOFF_SECONDS * (2 ** attempt)
-                        logger.warning(f"[LLM-stream] {config.id} rate-limited (429), retrying in {wait}s...")
-                        await asyncio.sleep(wait)
-                        continue  # Retry same provider
-                    if self._is_auth_failure(e):
-                        self._mark_provider_failed(provider_key, permanent=True)
-                    logger.warning(f"[LLM-stream] {config.id} failed: {e}")
-                    break  # Move to next provider
+                # Skip providers in cooldown (recent 401/403)
+                if self._is_provider_cooled_down(provider_key):
+                    logger.info(f"[LLM-stream] Skipping {config.id} (cooldown)")
+                    continue
 
-        yield LLMStreamEvent(event=StreamEventType.ERROR, error="All providers failed")
+                # Retry loop with exponential backoff for 429
+                for attempt in range(MAX_RETRIES_429 + 1):
+                    try:
+                        logger.info(f"[LLM-stream] Trying {config.id}/{model}" + (f" (retry {attempt})" if attempt else ""))
+                        yield LLMStreamEvent(
+                            event=StreamEventType.PROVIDER,
+                            provider=config.id,
+                            model=model,
+                        )
+                        async for event in self._stream_provider(
+                            config=config,
+                            model=model,
+                            api_key=api_key,
+                            request=request,
+                        ):
+                            yield event
+                        self._clear_provider_error(provider_key)
+                        succeeded[0] = True
+                        return  # Success — stop trying providers
+                    except Exception as e:
+                        if self._is_retryable(e) and attempt < MAX_RETRIES_429:
+                            wait = BASE_BACKOFF_SECONDS * (2 ** attempt)
+                            logger.warning(f"[LLM-stream] {config.id} rate-limited (429), retrying in {wait}s...")
+                            await asyncio.sleep(wait)
+                            continue  # Retry same provider
+                        if self._is_auth_failure(e):
+                            self._mark_provider_failed(provider_key, permanent=True)
+                        logger.warning(f"[LLM-stream] {config.id} failed: {e}")
+                        break  # Move to next provider
+
+        async for event in _try_chain(chain):
+            yield event
+
+        # Strict chain (a specific requested provider) exhausted without
+        # success — expand to every other provider/BYOK key rather than
+        # giving up, so a dead system-only provider can't block valid keys
+        # elsewhere in the chain from ever being tried.
+        if not succeeded[0] and strict:
+            logger.warning(f"[LLM-stream] '{request.provider}' chain exhausted, expanding to full fallback")
+            extended = build_provider_chain(
+                providers=self.providers,
+                preferred_provider=request.provider,
+                preferred_model=None,
+                user_keys=user_keys,
+                fallback_order=self.fallback_order,
+                strict_provider=False,
+                prefer_tool_model=bool(request.tools),
+            )
+            async for event in _try_chain(extended):
+                yield event
+
+        if not succeeded[0]:
+            yield LLMStreamEvent(event=StreamEventType.ERROR, error="All providers failed")
 
     # ──────────────────────────────────────────────
     # Provider dispatch (non-streaming)
