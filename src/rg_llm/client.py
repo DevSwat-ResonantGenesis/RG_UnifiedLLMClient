@@ -138,8 +138,12 @@ class UnifiedLLMClient:
 
         # No-preference default: task-based provider routing (provider-agnostic,
         # no hardcoded model id). An explicit user provider/model always wins.
-        user_selected_provider = bool(request.provider)
-        if not request.provider and not request.model:
+        # Treat "", "auto", "default", "none" as "no explicit provider".
+        _prov = (request.provider or "").strip().lower()
+        no_pref_provider = _prov in ("", "auto", "default", "none")
+        user_selected_provider = not no_pref_provider
+        if no_pref_provider and not request.model:
+            request.provider = ""  # normalize sentinel before chain-building
             _tp = self._task_preferred_provider(request, user_keys)
             if _tp:
                 request.provider = _tp
@@ -341,8 +345,12 @@ class UnifiedLLMClient:
 
         # No-preference default: task-based provider routing (provider-agnostic,
         # no hardcoded model id). An explicit user provider/model always wins.
-        user_selected_provider = bool(request.provider)
-        if not request.provider and not request.model:
+        # Treat "", "auto", "default", "none" as "no explicit provider".
+        _prov = (request.provider or "").strip().lower()
+        no_pref_provider = _prov in ("", "auto", "default", "none")
+        user_selected_provider = not no_pref_provider
+        if no_pref_provider and not request.model:
+            request.provider = ""  # normalize sentinel before chain-building
             _tp = self._task_preferred_provider(request, user_keys)
             if _tp:
                 request.provider = _tp
