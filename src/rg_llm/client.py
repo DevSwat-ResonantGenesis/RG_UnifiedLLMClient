@@ -268,8 +268,14 @@ class UnifiedLLMClient:
         if isinstance(exc, httpx.HTTPStatusError):
             status = exc.response.status_code
             if status == 401:
-                # Only cooldown if the body indicates a permanent key issue
-                body = exc.response.text.lower() if hasattr(exc.response, 'text') else ""
+                # Only cooldown if the body indicates a permanent key issue.
+                # exc.response may be an unread streaming response (from the
+                # stream() path's client.stream(...) calls) — .text raises
+                # httpx.ResponseNotRead in that case, so this must not crash.
+                try:
+                    body = exc.response.text.lower()
+                except Exception:
+                    body = ""
                 permanent_indicators = ["invalid_api_key", "invalid api key", "incorrect api key", "api key not found"]
                 return any(ind in body for ind in permanent_indicators)
             return False  # Don't cooldown on 403 (often transient: quota, rate limit)
