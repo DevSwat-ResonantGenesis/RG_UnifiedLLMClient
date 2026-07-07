@@ -4,12 +4,12 @@
 
 ### One async Python client for every AI provider
 
-**Built entirely by AI, orchestrated by [Louie Nemesh](https://dev-swat.com)**
+**Built entirely by AI, orchestrated by [Louie Nemesh](https://resonant.dev-swat.com)**
 
 [![License: RG Source Available](https://img.shields.io/badge/License-RG%20Source%20Available-blue.svg)](LICENSE.txt)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg)](https://python.org)
 [![Status: Production](https://img.shields.io/badge/Status-Production-brightgreen.svg)]()
-[![Platform](https://img.shields.io/badge/Platform-dev--swat.com-purple.svg)](https://dev-swat.com)
+[![Platform](https://img.shields.io/badge/Platform-dev--swat.com-purple.svg)](https://resonant.dev-swat.com)
 
 </div>
 
@@ -479,14 +479,14 @@ from rg_llm import UnifiedLLMClient, LLMRequest
 
 ### Server Path
 
-- **Server:** `deploy@dev-swat.com`
+- **Server:** `deploy@resonant.dev-swat.com`
 - **Source path:** `/home/deploy/RG_UnifiedLLMClient/src/rg_llm/`
 - **Mounted at:** `/app/rg_llm` (read-only) in 6 containers
 
 ### Updating in Production
 
 ```bash
-ssh deploy@dev-swat.com
+ssh deploy@resonant.dev-swat.com
 cd /home/deploy/RG_UnifiedLLMClient
 git pull origin main
 
@@ -701,9 +701,9 @@ Copyright (c) 2025-2026 Resonant Genesis / DevSwat. Founded and built by Louie N
 Licensed under the [Resonant Genesis Source Available License](LICENSE.txt).
 
 - **View & study**: Free for everyone
-- **Download & use**: Free with [platform registration](https://dev-swat.com/signup)
+- **Download & use**: Free with [platform registration](https://resonant.dev-swat.com/signup)
 - **Contribute**: Pull requests welcome
-- **Commercial use**: [Contact us](https://dev-swat.com/contact)
+- **Commercial use**: [Contact us](https://resonant.dev-swat.com/contact)
 
 ---
 
@@ -711,6 +711,6 @@ Licensed under the [Resonant Genesis Source Available License](LICENSE.txt).
 
 **Built on Resonant Genesis technology by Louie Nemesh**
 
-**Organization**: [DevSwat-ResonantGenesis](https://github.com/DevSwat-ResonantGenesis) | **Platform**: [dev-swat.com](https://dev-swat.com)
+**Organization**: [DevSwat-ResonantGenesis](https://github.com/DevSwat-ResonantGenesis) | **Platform**: [resonant.dev-swat.com](https://resonant.dev-swat.com)
 
 </div>
