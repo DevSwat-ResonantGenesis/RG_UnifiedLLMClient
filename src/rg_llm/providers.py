@@ -84,11 +84,11 @@ TOKENROUTER_SMART_ROUTING: dict[str, str] = {
 # hardcode a model id in the call path. An explicit user provider/model always
 # takes precedence over this. Only providers with a resolvable key are picked.
 TASK_PROVIDER_PREFERENCE: dict[str, list[str]] = {
-    "simple":          ["groq", "google", "deepseek", "anthropic", "openai", "tokenrouter"],
-    "chat":            ["groq", "google", "anthropic", "openai", "deepseek", "tokenrouter"],
+    "simple":          ["anthropic", "groq", "google", "deepseek", "openai", "tokenrouter"],
+    "chat":            ["anthropic", "groq", "google", "openai", "deepseek", "tokenrouter"],
     "reasoning":       ["anthropic", "openai", "deepseek", "google", "tokenrouter"],
     "coding":          ["anthropic", "deepseek", "openai", "groq", "tokenrouter"],
-    "coding_simple":   ["deepseek", "groq", "anthropic", "openai", "tokenrouter"],
+    "coding_simple":   ["anthropic", "deepseek", "groq", "openai", "tokenrouter"],
     "coding_complex":  ["anthropic", "openai", "deepseek", "openrouter", "tokenrouter"],
     "vision":          ["anthropic", "openai", "google", "tokenrouter"],
     "image":           ["openai", "google", "tokenrouter"],
@@ -347,9 +347,9 @@ PROVIDER_ALIASES: dict[str, str] = {
 
 # Default fallback order when no provider is specified
 DEFAULT_FALLBACK_ORDER: list[str] = [
+    "anthropic",
     "tokenrouter",
     "openai",
-    "anthropic",
     "groq",
     "google",
     "deepseek",
