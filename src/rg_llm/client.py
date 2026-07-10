@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
@@ -47,6 +48,20 @@ logger = logging.getLogger(__name__)
 
 # Default timeout for LLM calls (seconds)
 DEFAULT_TIMEOUT = 120.0
+
+# Some providers (Google Gemini) put the API key directly in the request URL
+# as a query param — raw exception strings (e.g. httpx's "for url '...'")
+# leak it verbatim into logs, session error_message, and API responses shown
+# to end users. Redact any key/token-shaped query param before an exception
+# is ever turned into a stored/returned string.
+_URL_SECRET_PARAM_RE = re.compile(
+    r"([?&](?:key|api_key|apikey|token|access_token|secret)=)[^&\s'\"]+",
+    re.IGNORECASE,
+)
+
+
+def _redact_secrets(text: str) -> str:
+    return _URL_SECRET_PARAM_RE.sub(r"\1***REDACTED***", text)
 
 # Retry config for rate-limited requests (429)
 MAX_RETRIES_429 = 3
@@ -223,7 +238,7 @@ class UnifiedLLMClient:
                             logger.warning(f"[LLM] {config.id} rate-limited (429), retrying in {wait}s...")
                             await asyncio.sleep(wait)
                             continue
-                        last_error = str(e)
+                        last_error = _redact_secrets(str(e))
                         fallback_chain.append({
                             "provider": config.id,
                             "status": "failed",
@@ -1298,7 +1313,7 @@ class UnifiedLLMClient:
             except Exception as e:
                 logger.error(f"[LLM-parallel] Failed: {e}")
                 return LLMResponse(
-                    content=f"Error: {str(e)}",
+                    content=f"Error: {_redact_secrets(str(e))}",
                     provider=req.provider or "unknown",
                     model=req.model or "unknown",
                 )
