@@ -292,47 +292,11 @@ BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
         supports_tools=True,
         supports_json_mode=True,
     ),
-    "bedrock": ProviderConfig(
-        id="bedrock",
-        name="AWS Bedrock",
-        api_type=ProviderType.OPENAI_COMPATIBLE,
-        base_url="https://bedrock-runtime.us-east-2.amazonaws.com/openai/v1",
-        default_model=_cheapest(
-            [
-                "anthropic.claude-3-5-sonnet-20241022-v2:0",
-                "anthropic.claude-3-haiku-20240307-v1:0",
-                "meta.llama3-1-70b-instruct-v1:0",
-                "amazon.nova-pro-v1:0",
-                "amazon.nova-lite-v1:0",
-            ],
-            {
-                "anthropic.claude-3-5-sonnet-20241022-v2:0": 3.0,
-                "anthropic.claude-3-haiku-20240307-v1:0": 0.25,
-                "meta.llama3-1-70b-instruct-v1:0": 0.72,
-                "amazon.nova-pro-v1:0": 0.8,
-                "amazon.nova-lite-v1:0": 0.06,
-            },
-        ),
-        models=[
-            "anthropic.claude-3-5-sonnet-20241022-v2:0",
-            "anthropic.claude-3-haiku-20240307-v1:0",
-            "meta.llama3-1-70b-instruct-v1:0",
-            "amazon.nova-pro-v1:0",
-            "amazon.nova-lite-v1:0",
-        ],
-        model_costs={
-            "anthropic.claude-3-5-sonnet-20241022-v2:0": 3.0,
-            "anthropic.claude-3-haiku-20240307-v1:0": 0.25,
-            "meta.llama3-1-70b-instruct-v1:0": 0.72,
-            "amazon.nova-pro-v1:0": 0.8,
-            "amazon.nova-lite-v1:0": 0.06,
-        },
-        env_key_name="AWS_BEDROCK_API_KEY",
-        supports_vision=True,
-        supports_tools=True,
-        supports_json_mode=True,
-    ),
 }
+# NOTE: "bedrock" (AWS Bedrock) was removed 2026-07-09 — no AWS account/keys
+# exist for it, so it could only ever appear as a broken, unusable option in
+# provider pickers. Re-add here (and the "aws"/"amazon" aliases below) if a
+# real AWS Bedrock account is provisioned in the future.
 
 # Provider alias map — normalize user input to canonical provider IDs
 PROVIDER_ALIASES: dict[str, str] = {
@@ -341,8 +305,6 @@ PROVIDER_ALIASES: dict[str, str] = {
     "claude": "anthropic",
     "gemini": "google",
     "llama": "groq",
-    "aws": "bedrock",
-    "amazon": "bedrock",
 }
 
 # Default fallback order when no provider is specified
