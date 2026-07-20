@@ -24,6 +24,8 @@ TOKENROUTER_TEXT_MODELS: list[str] = [
     "google/gemini-3-flash-preview",
     "deepseek/deepseek-v4-pro",
     "deepseek/deepseek-v4-flash",
+    "z-ai/glm-5.2-free",
+    "z-ai/glm-5.2",
     "z-ai/glm-5",
     "z-ai/glm-4.6v",
     "qwen/qwen3.6-plus",
@@ -62,8 +64,8 @@ TOKENROUTER_ALL_MODELS: list[str] = (
 
 # Smart routing: maps task type → best model for cost/quality tradeoff
 TOKENROUTER_SMART_ROUTING: dict[str, str] = {
-    "simple": "qwen/qwen3.5-flash",                     # Cheapest text
-    "chat": "deepseek/deepseek-v4-flash",                # Fast conversational
+    "simple": "z-ai/glm-5.2-free",                    # Cheapest text (trial: glm free tier)
+    "chat": "z-ai/glm-5.2-free",                       # Fast conversational (trial)
     "reasoning": "anthropic/claude-opus-4.7",            # Best reasoning
     "coding": "qwen/qwen3-coder-next",                  # Code specialist
     "image": "openai/gpt-5-image",                      # Image generation
@@ -72,7 +74,7 @@ TOKENROUTER_SMART_ROUTING: dict[str, str] = {
     "audio": "openai/gpt-audio",                         # Audio generation
     "audio_fast": "openai/gpt-audio-mini",               # Quick audio
     "vision": "z-ai/glm-4.6v",                          # Vision/multimodal
-    "free": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",  # Free tier
+    "free": "z-ai/glm-5.2-free",  # Free tier (trial: glm-5.2-free)
 }
 
 
@@ -84,20 +86,20 @@ TOKENROUTER_SMART_ROUTING: dict[str, str] = {
 # hardcode a model id in the call path. An explicit user provider/model always
 # takes precedence over this. Only providers with a resolvable key are picked.
 TASK_PROVIDER_PREFERENCE: dict[str, list[str]] = {
-    "simple":          ["anthropic", "groq", "google", "deepseek", "openai", "tokenrouter"],
-    "chat":            ["anthropic", "groq", "google", "openai", "deepseek", "tokenrouter"],
-    "reasoning":       ["anthropic", "openai", "deepseek", "google", "tokenrouter"],
-    "coding":          ["anthropic", "deepseek", "openai", "groq", "tokenrouter"],
-    "coding_simple":   ["anthropic", "deepseek", "groq", "openai", "tokenrouter"],
-    "coding_complex":  ["anthropic", "openai", "deepseek", "openrouter", "tokenrouter"],
-    "vision":          ["anthropic", "openai", "google", "tokenrouter"],
+    "simple":          ["tokenrouter", "anthropic", "groq", "google", "deepseek", "openai"],
+    "chat":            ["tokenrouter", "anthropic", "groq", "google", "openai", "deepseek"],
+    "reasoning":       ["tokenrouter", "anthropic", "openai", "deepseek", "google"],
+    "coding":          ["tokenrouter", "anthropic", "deepseek", "openai", "groq"],
+    "coding_simple":   ["tokenrouter", "anthropic", "deepseek", "groq", "openai"],
+    "coding_complex":  ["tokenrouter", "anthropic", "openai", "deepseek", "openrouter"],
+    "vision":          ["tokenrouter", "anthropic", "openai", "google"],
     "image":           ["openai", "google", "tokenrouter"],
     "image_fast":      ["openai", "google", "tokenrouter"],
     "video":           ["tokenrouter"],
     "video_fast":      ["tokenrouter"],
     "audio":           ["openai", "tokenrouter"],
     "audio_fast":      ["openai", "tokenrouter"],
-    "free":            ["groq", "google", "tokenrouter"],
+    "free":            ["tokenrouter", "groq", "google"],
 }
 
 
@@ -108,7 +110,7 @@ BUILTIN_PROVIDERS: dict[str, ProviderConfig] = {
         name="TokenRouter",
         api_type=ProviderType.OPENAI_COMPATIBLE,
         base_url="https://api.tokenrouter.com/v1",
-        default_model="google/gemini-3-flash-preview",
+        default_model="z-ai/glm-5.2-free",  # Trial: free reasoning model first
         models=TOKENROUTER_ALL_MODELS,
         env_key_name="TOKENROUTER_API_KEY",
         supports_vision=True,
@@ -309,8 +311,8 @@ PROVIDER_ALIASES: dict[str, str] = {
 
 # Default fallback order when no provider is specified
 DEFAULT_FALLBACK_ORDER: list[str] = [
-    "anthropic",
     "tokenrouter",
+    "anthropic",
     "openai",
     "groq",
     "google",
